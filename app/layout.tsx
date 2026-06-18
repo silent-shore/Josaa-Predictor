@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
-import { BarChart3, Database, GitCompare, Search } from "lucide-react";
+import { BarChart3, Search } from "lucide-react";
 import "./globals.css";
 import { Disclaimer } from "@/components/disclaimer";
 
@@ -11,10 +11,8 @@ export const metadata: Metadata = {
 };
 
 const navItems: Array<{ label: string; href: Route }> = [
-  { label: "Search", href: "/search" },
-  { label: "Predictor", href: "/predictor" },
-  { label: "Compare", href: "/compare" },
-  { label: "Data", href: "/status" }
+  { label: "OR-CR Search", href: "/search" },
+  { label: "Predictor", href: "/predictor" }
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -31,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="flex items-center gap-1 overflow-x-auto text-sm text-[var(--muted)]">
               {navItems.map(({ label, href }, index) => {
-                const Icon = [Search, BarChart3, GitCompare, Database][index];
+                const Icon = [Search, BarChart3][index];
                 return (
                 <Link
                   key={href}

@@ -5,14 +5,16 @@ export type Option = {
 
 export const INSTITUTE_TYPE_OPTIONS: Option[] = [
   { value: "All", label: "All institute types" },
-  { value: "IIT", label: "IIT" },
-  { value: "NIT", label: "NIT" },
-  { value: "IIIT", label: "IIIT" },
-  { value: "GFTI", label: "GFTI" },
+  { value: "IIT", label: "Indian Institute of Technology (IIT)" },
+  { value: "NIT", label: "National Institute of Technology (NIT)" },
+  { value: "IIIT", label: "Indian Institute of Information Technology (IIIT)" },
+  { value: "GFTI", label: "Government Funded Technical Institutions (GFTI)" },
+  { value: "IISc", label: "Indian Institute of Science (IISc)" },
   { value: "Indian Institute of Technology", label: "Indian Institute of Technology" },
   { value: "National Institute of Technology", label: "National Institute of Technology" },
   { value: "Indian Institute of Information Technology", label: "Indian Institute of Information Technology" },
-  { value: "Government Funded Technical Institutions", label: "Government Funded Technical Institutions" }
+  { value: "Government Funded Technical Institutions", label: "Government Funded Technical Institutions" },
+  { value: "Indian Institute of Science", label: "Indian Institute of Science" }
 ];
 
 export const EXAM_TYPE_OPTIONS: Option[] = [
@@ -22,26 +24,28 @@ export const EXAM_TYPE_OPTIONS: Option[] = [
 
 export const QUOTA_OPTIONS: Option[] = [
   { value: "All", label: "All quotas" },
-  { value: "AI", label: "AI" },
-  { value: "HS", label: "HS" },
-  { value: "OS", label: "OS" },
-  { value: "GO", label: "GO" },
-  { value: "JK", label: "JK" },
-  { value: "LA", label: "LA" }
+  { value: "AI", label: "All India (AI)" },
+  { value: "HS", label: "Home State (HS)" },
+  { value: "OS", label: "Other State (OS)" },
+  { value: "GO", label: "Goa (GO)" },
+  { value: "JK", label: "Jammu & Kashmir (JK)" },
+  { value: "LA", label: "Ladakh (LA)" }
 ];
 
-export const ALL_QUOTA_ONLY_OPTIONS: Option[] = [{ value: "All", label: "All quotas" }];
+export const ALL_QUOTA_ONLY_OPTIONS: Option[] = [{ value: "AI", label: "All India (AI)" }];
 
 export const GENERAL_QUOTA_OPTIONS: Option[] = [
-  { value: "All", label: "All quotas" },
-  { value: "AI", label: "AI" }
+  { value: "AI", label: "All India (AI)" }
 ];
 
 export const NIT_QUOTA_OPTIONS: Option[] = [
-  { value: "All", label: "All quotas" },
-  { value: "AI", label: "AI" },
-  { value: "HS", label: "HS" },
-  { value: "OS", label: "OS" }
+  { value: "AI", label: "All India (AI)" },
+  { value: "OS", label: "Other State (OS)" }
+];
+
+export const NIT_HOME_STATE_QUOTA_OPTIONS: Option[] = [
+  ...NIT_QUOTA_OPTIONS,
+  { value: "HS", label: "Home State (HS)" }
 ];
 
 export const GENDER_OPTIONS: Option[] = [
@@ -75,9 +79,8 @@ export const SEAT_TYPES = SEAT_TYPE_OPTIONS.map((option) => option.value);
 
 export const PREDICTOR_THRESHOLDS = {
   safe: 0.9,
-  moderate: 1,
-  risky: 1.1,
-  veryRisky: 1.25
+  moderate: 1.05,
+  reach: 1.2
 } as const;
 
 export function normalizeInstituteTypeFilter(value: string | undefined) {
@@ -85,14 +88,15 @@ export function normalizeInstituteTypeFilter(value: string | undefined) {
     IIT: "Indian Institute of Technology",
     NIT: "National Institute of Technology",
     IIIT: "Indian Institute of Information Technology",
-    GFTI: "Government Funded Technical Institutions"
+    GFTI: "Government Funded Technical Institutions",
+    IISc: "Indian Institute of Science"
   };
   return value ? aliases[value] ?? value : value;
 }
 
 export function instituteTypesForExam(examType: string | undefined) {
   if (examType === "JEE Advanced") {
-    return ["Indian Institute of Technology"];
+    return ["Indian Institute of Technology", "Indian Institute of Science"];
   }
 
   if (examType === "JEE Main") {
@@ -114,13 +118,13 @@ export function usesCategoryRank(seatType: string | undefined) {
   return seatType !== "OPEN" && seatType !== "OPEN (PwD)";
 }
 
-export function quotaOptionsForInstituteType(instituteType: string | undefined) {
-  if (instituteType === "IIT" || instituteType === "IIIT") {
+export function quotaOptionsForInstituteType(instituteType: string | undefined, hasState = false) {
+  if (instituteType === "IIT" || instituteType === "IIIT" || instituteType === "IISc") {
     return ALL_QUOTA_ONLY_OPTIONS;
   }
 
   if (instituteType === "NIT") {
-    return NIT_QUOTA_OPTIONS;
+    return hasState ? NIT_HOME_STATE_QUOTA_OPTIONS : NIT_QUOTA_OPTIONS;
   }
 
   return GENERAL_QUOTA_OPTIONS;

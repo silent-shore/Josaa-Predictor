@@ -13,6 +13,23 @@ export async function GET(request: NextRequest) {
 
   const filters = parsed.data;
   const supabase = await createClient();
+  const yearSet = new Set<number>();
+  const yearPageSize = 1000;
+  for (let page = 0; page < 50; page += 1) {
+    const { data: yearRows, error: yearError } = await supabase
+      .from("josaa_cutoffs")
+      .select("year")
+      .order("year", { ascending: false })
+      .range(page * yearPageSize, page * yearPageSize + yearPageSize - 1);
+    if (yearError) return NextResponse.json({ error: yearError.message }, { status: 500 });
+    (yearRows ?? []).forEach((row) => yearSet.add(row.year));
+    if (!yearRows || yearRows.length < yearPageSize) break;
+  }
+
+  const availableYears = Array.from(yearSet).sort((a, b) => b - a);
+  const predictionYear = filters.year ?? ((availableYears[0] ?? new Date().getFullYear()) + 1);
+  const historyStartYear = predictionYear - 5;
+  const historyEndYear = predictionYear - 1;
   const instituteTypes = effectiveInstituteTypes(filters);
   const shouldFilterInstituteRelation =
     Boolean(filters.state) || Boolean(instituteTypes?.length);
@@ -23,11 +40,12 @@ export async function GET(request: NextRequest) {
     .from("josaa_cutoffs")
     .select(`id,year,round,institute_name_raw,program_name_raw,quota,seat_type,gender,opening_rank_raw,closing_rank_raw,closing_rank_num,rank_list_type,${instituteSelect}`)
     .not("closing_rank_num", "is", null)
+    .gte("year", historyStartYear)
+    .lte("year", historyEndYear)
     .lte("closing_rank_num", Math.ceil(filters.rank * 1.25))
     .order("closing_rank_num", { ascending: false })
-    .limit(250);
+    .limit(500);
 
-  if (filters.year) query = query.eq("year", filters.year);
   if (filters.round) query = query.eq("round", filters.round);
   if (instituteTypes?.length) query = query.in("institutes.institute_type", instituteTypes);
   if (filters.state) query = query.ilike("institutes.state", `%${filters.state}%`);
@@ -39,7 +57,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const grouped = { Safe: [], Moderate: [], Risky: [], "Very Risky": [] } as Record<string, unknown[]>;
+  const grouped = { Safe: [], Moderate: [], Reach: [] } as Record<string, unknown[]>;
   for (const row of data ?? []) {
     const bucket = classifyRank(filters.rank, row.closing_rank_num as number);
     if (bucket) grouped[bucket].push(row);
@@ -47,6 +65,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     grouped,
+    prediction_year: predictionYear,
+    history_years: availableYears.filter((year) => year >= historyStartYear && year <= historyEndYear),
     explanation: "This is based only on previous OR-CR data and cannot guarantee admission."
   });
 }

@@ -16,6 +16,25 @@ import certifi
 from pydantic import BaseModel, Field, ValidationError
 
 
+def load_local_env() -> None:
+    """Load project .env files for local CLI jobs without echoing secrets."""
+    root = Path(__file__).resolve().parents[2]
+    for env_path in (root / ".env", root / ".env.local"):
+        if not env_path.exists():
+            continue
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+
+load_local_env()
+
+
 @dataclass
 class ImportValidation:
     total_rows: int

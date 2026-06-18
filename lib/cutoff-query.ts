@@ -23,19 +23,27 @@ export type CutoffRow = {
   institutes?: { institute_type: string | null; state: string | null } | Array<{ institute_type: string | null; state: string | null }> | null;
 };
 
+export function splitFilterValues(value: string | undefined, separator = "~") {
+  return value
+    ?.split(separator)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function effectiveInstituteTypes(filters: Pick<CutoffQuery, "exam_type" | "institute_type" | "quota">) {
   const examTypes = instituteTypesForExam(filters.exam_type);
-  const selectedType =
-    filters.institute_type && filters.institute_type !== "All"
-      ? normalizeInstituteTypeFilter(filters.institute_type)
-      : undefined;
+  const selectedTypes = splitFilterValues(filters.institute_type)
+    ?.filter((type) => type !== "All")
+    .map((type) => normalizeInstituteTypeFilter(type))
+    .filter((type): type is string => Boolean(type));
 
-  if (selectedType && examTypes && !examTypes.includes(selectedType)) {
-    return ["__no_matching_institute_type__"];
+  if (selectedTypes?.length && examTypes) {
+    const matchingTypes = selectedTypes.filter((type) => examTypes.includes(type));
+    return matchingTypes.length ? matchingTypes : ["__no_matching_institute_type__"];
   }
 
-  if (selectedType) {
-    return [selectedType];
+  if (selectedTypes?.length) {
+    return selectedTypes;
   }
 
   if ((filters.quota === "HS" || filters.quota === "OS") && (!examTypes || examTypes.includes("National Institute of Technology"))) {
@@ -55,6 +63,7 @@ export function shouldApplyQuota(filters: Pick<CutoffQuery, "exam_type" | "insti
     instituteTypes?.length &&
     instituteTypes.every(
       (type) => type === "Indian Institute of Technology" || type === "Indian Institute of Information Technology"
+        || type === "Indian Institute of Science"
     )
   ) {
     return false;
@@ -84,11 +93,20 @@ export function applyCutoffFilters(client: SupabaseClient, filters: CutoffQuery)
     query = query.in("institutes.institute_type", instituteTypes);
   }
   if (filters.state) query = query.ilike("institutes.state", `%${filters.state}%`);
+  const selectedInstitutes = splitFilterValues(filters.institute_values);
+  const selectedPrograms = splitFilterValues(filters.program_values);
+  const selectedQuotas = splitFilterValues(filters.quota);
+  const selectedSeatTypes = splitFilterValues(filters.seat_type);
+  const selectedGenders = splitFilterValues(filters.gender);
   if (filters.institute) query = query.ilike("institute_name_raw", `%${filters.institute}%`);
+  if (selectedInstitutes?.length) query = query.in("institute_name_raw", selectedInstitutes);
   if (filters.program) query = query.ilike("program_name_raw", `%${filters.program}%`);
-  if (shouldApplyQuota(filters)) query = query.eq("quota", filters.quota);
-  if (filters.seat_type && filters.seat_type !== "All") query = query.eq("seat_type", filters.seat_type);
-  if (filters.gender && filters.gender !== "All") query = query.eq("gender", filters.gender);
+  if (selectedPrograms?.length) query = query.in("program_name_raw", selectedPrograms);
+  if (shouldApplyQuota(filters) && selectedQuotas?.length) query = query.in("quota", selectedQuotas);
+  if (selectedSeatTypes?.length && !selectedSeatTypes.includes("All")) query = query.in("seat_type", selectedSeatTypes);
+  if (selectedGenders?.length && !selectedGenders.includes("All")) query = query.in("gender", selectedGenders);
+  if (filters.opening_min) query = query.gte("opening_rank_num", filters.opening_min);
+  if (filters.opening_max) query = query.lte("opening_rank_num", filters.opening_max);
   if (filters.rank_min) query = query.gte("closing_rank_num", filters.rank_min);
   if (filters.rank_max) query = query.lte("closing_rank_num", filters.rank_max);
 
@@ -96,6 +114,7 @@ export function applyCutoffFilters(client: SupabaseClient, filters: CutoffQuery)
   const sortKey = filters.sort.replace("-", "");
   const sortMap: Record<string, string> = {
     closing_rank: "closing_rank_num",
+    opening_rank: "opening_rank_num",
     institute: "institute_name_raw",
     program: "program_name_raw",
     year: "year",

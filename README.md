@@ -8,7 +8,7 @@ This is an unofficial helper tool. Data is sourced from publicly available JoSAA
 
 - Next.js App Router, TypeScript, Tailwind CSS
 - Supabase Postgres and Supabase Auth
-- Server-side API routes for filtering, prediction, status, and admin import
+- Server-side API routes for filtering, prediction, status, and cutoff metadata
 - Python import pipeline with Playwright scraper skeleton
 - Zod validation, Recharts, focused unit tests
 
@@ -17,8 +17,6 @@ This is an unofficial helper tool. Data is sourced from publicly available JoSAA
 1. Create a Supabase project.
 2. In the SQL editor, run [supabase/migrations/001_initial_schema.sql](/Users/shashi/Desktop/Cutoff%20Compass/supabase/migrations/001_initial_schema.sql).
 3. Optional local UI testing only: run [supabase/seed.sql](/Users/shashi/Desktop/Cutoff%20Compass/supabase/seed.sql). This data is fake and clearly marked.
-4. Create an admin user through Supabase Auth.
-5. Add that user's email to the server-only `ADMIN_EMAILS` environment variable.
 
 ## Environment
 
@@ -28,23 +26,11 @@ Copy [.env.example](/Users/shashi/Desktop/Cutoff%20Compass/.env.example) to `.en
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-ADMIN_EMAILS=admin@example.com
 JOSAA_SOURCE_URL=https://josaa.admissions.nic.in/Applicant/SeatAllotmentResult/CurrentORCR.aspx
+JOSAA_ARCHIVE_SOURCE_URL=https://josaa.admissions.nic.in/applicant/seatmatrix/openingclosingrankarchieve.aspx
 ```
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` to frontend code or Vercel public variables. If a service role key is ever shared in chat, logs, screenshots, or a browser, rotate it in Supabase and replace only the server-side environment value.
-
-## Admin Access
-
-Admin access is hidden from public navigation. Create a Supabase Auth user, then put that user's email in the server-only `ADMIN_EMAILS` env var:
-
-```bash
-ADMIN_EMAILS=admin@example.com,second-admin@example.com
-```
-
-The app compares the signed-in user's email to `ADMIN_EMAILS` on the server. It never renders the allowed admin email list or the service role key in the website UI.
-
-Open `/admin/login` directly to sign in. `/admin/import` is a protected fallback CSV uploader; the preferred full import path is the CLI pipeline below.
 
 ## Run Locally
 
@@ -104,6 +90,28 @@ python scripts/scrape-current-orcr/scrape_current_orcr.py \
 
 The scraper writes raw rows, normalized CSV, cache files, screenshots on failures, and `import_summary.json` under `data/`. The importer upserts institutes and academic programs first, then upserts cutoff rows using the requested unique key. It creates `import_batches`, `import_errors`, and `data_snapshots` records.
 
+Import previous-year archive data from the JoSAA archive page:
+
+```bash
+python scripts/scrape-archive-orcr/scrape_archive_orcr.py \
+  --years 2025 2024 2023 2022 2021 \
+  --output-dir data/raw/josaa-archive-2021-2025 \
+  --delay 3 \
+  --import \
+  --fail-on-invalid
+```
+
+Validate previously scraped archive files without hitting JoSAA again:
+
+```bash
+python scripts/scrape-archive-orcr/scrape_archive_orcr.py \
+  --skip-scrape \
+  --output-dir data/raw/josaa-archive-2021-2025 \
+  --fail-on-invalid
+```
+
+The predictor uses a rolling five-year history window. For example, target year `2027` uses `2022-2026`; when `2027` data exists and the target becomes `2028`, `2021` is automatically irrelevant and the predictor uses `2023-2027`.
+
 You can still run the lower-level tools manually:
 
 ```bash
@@ -141,8 +149,7 @@ Do not overload JoSAA. Cache data locally, scrape slowly, retry with backoff, an
 
 - Create the Supabase project and run SQL migrations.
 - Fill `.env.local`.
-- Set `ADMIN_EMAILS` to at least one Supabase Auth user email.
 - Rotate and set `SUPABASE_SERVICE_ROLE_KEY` server-side only.
-- Inspect the current JoSAA page selectors before running a full scrape.
+- Inspect the current and archive JoSAA page selectors before running a full scrape.
 - Import real cleaned JoSAA data before using the app for counselling decisions.
 # Josaa-Predictor

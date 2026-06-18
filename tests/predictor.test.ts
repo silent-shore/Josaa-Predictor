@@ -10,9 +10,8 @@ describe("classifyRank", () => {
     expect(classifyRank(1000, 1000)).toBe("Moderate");
   });
 
-  it("classifies risky and very risky ranks", () => {
-    expect(classifyRank(1100, 1000)).toBe("Risky");
-    expect(classifyRank(1250, 1000)).toBe("Very Risky");
+  it("classifies reach ranks", () => {
+    expect(classifyRank(1100, 1000)).toBe("Reach");
   });
 
   it("ignores ranks outside the nearby window", () => {
