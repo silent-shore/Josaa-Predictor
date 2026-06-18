@@ -1,0 +1,15 @@
+[
+  {
+    "year": "auto",
+    "round": "1",
+    "institute_type": "National Institute of Technology",
+    "institute": "ALL",
+    "program": "ALL",
+    "seat_type": "ALL",
+    "round_selector": "#ctl00_ContentPlaceHolder1_ddlroundno",
+    "institute_type_selector": "#ctl00_ContentPlaceHolder1_ddlInstype",
+    "institute_selector": "#ctl00_ContentPlaceHolder1_ddlInstitute",
+    "program_selector": "#ctl00_ContentPlaceHolder1_ddlBranch",
+    "seat_type_selector": "#ctl00_ContentPlaceHolder1_ddlSeattype"
+  }
+]

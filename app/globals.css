@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f3ee;
+  --foreground: #18201d;
+  --muted: #66706b;
+  --border: #ded8ce;
+  --panel: #ffffff;
+  --primary: #0f6b5b;
+  --primary-dark: #0a4f43;
+  --accent: #b65f2a;
+  --accent-soft: #fff1e7;
+  --warning: #9a6a13;
+  --danger: #b13a32;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid rgba(15, 107, 91, 0.28);
+  outline-offset: 2px;
+}
+
+.page-shell {
+  margin-inline: auto;
+  max-width: 80rem;
+  padding: 1.5rem 1rem 2.5rem;
+}
+
+.page-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.surface {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 14px 35px rgba(24, 32, 29, 0.06);
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 640px) {
+  .page-shell {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-shell {
+    padding-inline: 2rem;
+  }
+}
