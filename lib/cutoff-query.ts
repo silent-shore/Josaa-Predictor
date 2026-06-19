@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
 import type { cutoffsQuerySchema } from "@/lib/validators/cutoffs";
-import { instituteTypesForExam, normalizeInstituteTypeFilter } from "@/lib/constants";
+import { instituteTypesForExam, NIT_STATE_PATTERNS, normalizeInstituteTypeFilter } from "@/lib/constants";
 
 export type CutoffQuery = z.infer<typeof cutoffsQuerySchema>;
 
@@ -72,10 +72,17 @@ export function shouldApplyQuota(filters: Pick<CutoffQuery, "exam_type" | "insti
   return true;
 }
 
+function applyHomeStateInstituteFilter(query: any, state: string | undefined) {
+  if (!state) return query;
+  const patterns = NIT_STATE_PATTERNS[state] ?? [];
+  if (!patterns.length) return query;
+  return query.or(patterns.map((pattern) => `institute_name_raw.ilike.*${pattern}*`).join(","));
+}
+
 export function applyCutoffFilters(client: SupabaseClient, filters: CutoffQuery) {
   const instituteTypes = effectiveInstituteTypes(filters);
   const shouldFilterInstituteRelation =
-    Boolean(filters.state) || Boolean(instituteTypes?.length);
+    Boolean(instituteTypes?.length);
   const instituteSelect = shouldFilterInstituteRelation
     ? "institutes!inner(institute_type,state)"
     : "institutes(institute_type,state)";
@@ -92,7 +99,9 @@ export function applyCutoffFilters(client: SupabaseClient, filters: CutoffQuery)
   if (instituteTypes?.length) {
     query = query.in("institutes.institute_type", instituteTypes);
   }
-  if (filters.state) query = query.ilike("institutes.state", `%${filters.state}%`);
+  if (filters.state) {
+    query = applyHomeStateInstituteFilter(query, filters.state);
+  }
   const selectedInstitutes = splitFilterValues(filters.institute_values);
   const selectedPrograms = splitFilterValues(filters.program_values);
   const selectedQuotas = splitFilterValues(filters.quota);

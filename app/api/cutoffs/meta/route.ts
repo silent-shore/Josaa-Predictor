@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { effectiveInstituteTypes, shouldApplyQuota, splitFilterValues } from "@/lib/cutoff-query";
+import { NIT_STATE_PATTERNS } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { cutoffsQuerySchema } from "@/lib/validators/cutoffs";
 
@@ -30,6 +31,13 @@ function shortInstituteType(value: string | undefined) {
   return value;
 }
 
+function applyHomeStateInstituteFilter(query: any, state: string | undefined) {
+  if (!state) return query;
+  const patterns = NIT_STATE_PATTERNS[state] ?? [];
+  if (!patterns.length) return query;
+  return query.or(patterns.map((pattern) => `institute_name_raw.ilike.*${pattern}*`).join(","));
+}
+
 export async function GET(request: NextRequest) {
   const parsed = cutoffsQuerySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams.entries()));
   if (!parsed.success) {
@@ -38,37 +46,55 @@ export async function GET(request: NextRequest) {
 
   const filters = parsed.data;
   const supabase = await createClient();
-  const [{ data: snapshotYearRows }, { data: cutoffYearRows }, { data: snapshotRoundRows }, { data: snapshot }] = await Promise.all([
+  const [{ data: snapshotYearRows }, { data: snapshotRoundRows }, { data: snapshot }] = await Promise.all([
     supabase.from("data_snapshots").select("year").order("year", { ascending: false }),
-    supabase.from("josaa_cutoffs").select("year").order("year", { ascending: false }).range(0, 999),
     supabase.from("data_snapshots").select("year,round").order("year", { ascending: false }),
     supabase.from("data_snapshots").select("created_at,source_url").order("created_at", { ascending: false }).limit(1).maybeSingle()
   ]);
 
-  const years = Array.from(new Set([...(snapshotYearRows ?? []), ...(cutoffYearRows ?? [])].map((row) => row.year))).filter(Boolean);
+  const currentYear = new Date().getFullYear();
+  const candidateYears = Array.from({ length: currentYear - 2016 + 2 }, (_, index) => currentYear + 1 - index);
+  const cutoffYearCounts = await Promise.all(
+    candidateYears.map(async (year) => {
+      const { count, error } = await supabase.from("josaa_cutoffs").select("id", { count: "exact", head: true }).eq("year", year);
+      if (error) throw error;
+      return { year, count: count ?? 0 };
+    })
+  ).catch((error: Error) => error);
+
+  if (cutoffYearCounts instanceof Error) {
+    return NextResponse.json({ error: cutoffYearCounts.message }, { status: 500 });
+  }
+
+  const years = Array.from(new Set([...(snapshotYearRows ?? []).map((row) => row.year), ...cutoffYearCounts.filter((row) => row.count > 0).map((row) => row.year)])).filter(Boolean).sort((a, b) => b - a);
   const roundSourceYear = filters.year ?? years[0];
-  const roundRows: Array<{ year?: number; round: number }> = [];
-  for (let page = 0; page < 80; page += 1) {
-    const from = page * 1000;
-    const query = filters.year
-      ? supabase.from("josaa_cutoffs").select("round").eq("year", filters.year).order("round", { ascending: true }).range(from, from + 999)
-      : supabase.from("josaa_cutoffs").select("round,year").order("year", { ascending: false }).range(from, from + 999);
-    const { data, error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    roundRows.push(...((data ?? []) as Array<{ year?: number; round: number }>));
-    if (!data || data.length < 1000) break;
+  const candidateRounds = Array.from({ length: 15 }, (_, index) => index + 1);
+  const roundCounts = await Promise.all(
+    candidateRounds.map(async (round) => {
+      const { count, error } = await supabase
+        .from("josaa_cutoffs")
+        .select("id", { count: "exact", head: true })
+        .eq("year", roundSourceYear)
+        .eq("round", round);
+      if (error) throw error;
+      return { round, count: count ?? 0 };
+    })
+  ).catch((error: Error) => error);
+
+  if (roundCounts instanceof Error) {
+    return NextResponse.json({ error: roundCounts.message }, { status: 500 });
   }
   const rounds = Array.from(
     new Set(
-      [...(snapshotRoundRows ?? []), ...(roundRows ?? [])]
-        .filter((row) => !("year" in row) || row.year === roundSourceYear)
+      [...(snapshotRoundRows ?? []), ...roundCounts.filter((row) => row.count > 0).map((row) => ({ year: roundSourceYear, round: row.round }))]
+        .filter((row) => row.year === roundSourceYear)
         .map((row) => row.round)
     )
   )
     .filter(Boolean)
     .sort((a, b) => a - b);
   const instituteTypes = effectiveInstituteTypes(filters);
-  const instituteSelect = filters.state || instituteTypes?.length ? "institutes!inner(institute_type,state)" : "institutes(institute_type,state)";
+  const instituteSelect = instituteTypes?.length ? "institutes!inner(institute_type,state)" : "institutes(institute_type,state)";
 
   const selectedInstitutes = splitFilterValues(filters.institute_values);
   const selectedPrograms = splitFilterValues(filters.program_values);
@@ -85,7 +111,7 @@ export async function GET(request: NextRequest) {
     if (filters.year) query = query.eq("year", filters.year);
     if (filters.round) query = query.eq("round", filters.round);
     if (instituteTypes?.length) query = query.in("institutes.institute_type", instituteTypes);
-    if (filters.state) query = query.ilike("institutes.state", `%${filters.state}%`);
+    if (filters.state) query = applyHomeStateInstituteFilter(query, filters.state);
     if (filters.institute) query = query.ilike("institute_name_raw", `%${filters.institute}%`);
     if (filters.program) query = query.ilike("program_name_raw", `%${filters.program}%`);
     if (selectedInstitutes?.length) query = query.in("institute_name_raw", selectedInstitutes);
@@ -102,7 +128,7 @@ export async function GET(request: NextRequest) {
 
   const rows: Array<Record<string, unknown>> = [];
   const pageSize = 1000;
-  for (let page = 0; page < 50; page += 1) {
+  for (let page = 0; page < 8; page += 1) {
     const from = page * pageSize;
     const { data, error } = await buildRowsQuery(from, from + pageSize - 1);
     if (error) {

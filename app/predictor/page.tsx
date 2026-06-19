@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, OptionList } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { GENDER_OPTIONS, INSTITUTE_TYPE_OPTIONS, SEAT_TYPE_OPTIONS, usesCategoryRank } from "@/lib/constants";
+import { GENDER_OPTIONS, INDIA_STATE_OPTIONS, INSTITUTE_TYPE_OPTIONS, SEAT_TYPE_OPTIONS, usesCategoryRank } from "@/lib/constants";
 
 type Result = {
   id: string;
@@ -16,9 +16,19 @@ type Result = {
   year: number;
   round: number;
   closing_rank_raw: string;
+  closing_rank_num: number;
   quota: string;
   seat_type: string;
   gender: string;
+};
+
+type YearAnalysis = {
+  year: number;
+  median_closing_rank: number | null;
+  comparison_median: number | null;
+  delta_percent: number | null;
+  label: string;
+  reason: string;
 };
 
 const buckets = ["Safe", "Moderate", "Reach"] as const;
@@ -27,7 +37,11 @@ export default function PredictorPage() {
   const [examType, setExamType] = useState("JEE Main");
   const [seatType, setSeatType] = useState("OPEN");
   const [instituteType, setInstituteType] = useState("All");
+  const [homeState, setHomeState] = useState("");
   const [grouped, setGrouped] = useState<Record<string, Result[]> | null>(null);
+  const [groupedByYear, setGroupedByYear] = useState<Record<string, Record<string, Result[]>>>({});
+  const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [yearAnalysis, setYearAnalysis] = useState<YearAnalysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submittedRank, setSubmittedRank] = useState<string | null>(null);
@@ -36,10 +50,14 @@ export default function PredictorPage() {
   const typeOptions = useMemo(
     () =>
       examType === "JEE Advanced"
-        ? INSTITUTE_TYPE_OPTIONS.filter((option) => ["All", "IIT", "IISc"].includes(option.value))
+        ? INSTITUTE_TYPE_OPTIONS.filter((option) => option.value === "IIT")
         : INSTITUTE_TYPE_OPTIONS.filter((option) => ["All", "NIT", "IIIT", "GFTI"].includes(option.value)),
     [examType]
   );
+  const homeStateEnabled = examType === "JEE Main" && (instituteType === "NIT" || instituteType === "All");
+  const homeStateMessage = homeStateEnabled
+    ? "Home State applies only to NIT choices."
+    : "Home State is unavailable for IIT/IIIT/GFTI-only selections.";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,6 +72,7 @@ export default function PredictorPage() {
     }
     params.set("exam_type", examType);
     if (instituteType !== "All") params.set("institute_type", instituteType);
+    if (homeStateEnabled && homeState) params.set("state", homeState);
     setSubmittedRank(params.get("rank"));
 
     try {
@@ -64,6 +83,9 @@ export default function PredictorPage() {
         return;
       }
       setGrouped(body.grouped);
+      setGroupedByYear(body.grouped_by_year ?? {});
+      setYearAnalysis(body.year_analysis ?? []);
+      setSelectedYear("all");
       setPredictionMeta({ prediction_year: body.prediction_year, history_years: body.history_years });
     } catch {
       setError("Prediction failed. Please try again.");
@@ -95,14 +117,17 @@ export default function PredictorPage() {
         </div>
       </section>
 
-      <form onSubmit={submit} className="surface grid gap-x-6 gap-y-6 rounded-2xl p-6 sm:p-7 xl:grid-cols-12">
-        <Field label="Exam" className="xl:col-span-4">
+      <form onSubmit={submit} className="surface rounded-2xl p-5 shadow-2xl shadow-emerald-950/10 sm:p-7">
+        <div className="rounded-xl border border-[var(--border)] bg-white/85 p-5 sm:p-6">
+          <div className="grid gap-x-6 gap-y-6 xl:grid-cols-12">
+        <Field label="Exam" className="xl:col-span-3">
           <Select
             name="exam_type"
             value={examType}
             onChange={(event) => {
               setExamType(event.target.value);
-              setInstituteType("All");
+              setInstituteType(event.target.value === "JEE Advanced" ? "IIT" : "All");
+              setHomeState("");
             }}
             required
           >
@@ -116,11 +141,11 @@ export default function PredictorPage() {
             ? "For GEN-EWS, OBC-NCL, SC, ST or PwD seat types, use your category rank from the scorecard."
             : "For OPEN seat type, use your OPEN / CRL rank. This keeps comparisons aligned with the cutoff list."
           }
-          className="xl:col-span-4"
+          className="xl:col-span-3"
         >
           <Input name="rank" required inputMode="numeric" placeholder="12000" />
         </Field>
-        <Field label="Seat type" className="xl:col-span-4">
+        <Field label="Seat type" className="xl:col-span-3">
           <Select name="seat_type" value={seatType} onChange={(event) => setSeatType(event.target.value)}>
             <OptionList options={SEAT_TYPE_OPTIONS} />
           </Select>
@@ -130,18 +155,32 @@ export default function PredictorPage() {
             <OptionList options={GENDER_OPTIONS} />
           </Select>
         </Field>
-        <Field label="Institute type" className="xl:col-span-3">
-          <Select value={instituteType} onChange={(event) => setInstituteType(event.target.value)}>
-            {typeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        <div className="grid gap-2 xl:col-span-3">
+          <span className="text-xs font-black text-[var(--muted)]">Institute type</span>
+          <div className="flex min-h-12 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
+            {typeOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                disabled={examType === "JEE Advanced"}
+                onClick={() => {
+                  setInstituteType(option.value);
+                  if (option.value !== "NIT" && option.value !== "All") setHomeState("");
+                }}
+                className={`flex-1 border-r border-[var(--border)] px-3 text-xs font-black last:border-r-0 disabled:cursor-not-allowed ${instituteType === option.value ? "bg-[var(--primary)] text-white" : "hover:bg-emerald-50"}`}
+              >
+                {option.value}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="Home State" hint={homeStateMessage} className="xl:col-span-3">
+          <Select value={homeState} onChange={(event) => setHomeState(event.target.value)} disabled={!homeStateEnabled}>
+            <option value="">{homeStateEnabled ? "Optional NIT home state" : "Not applicable"}</option>
+            {INDIA_STATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </Select>
         </Field>
-        <Field label="Target year" flyoutHint="Example: target year 2027 uses the 2022-2026 cutoff window." className="xl:col-span-2">
-          <Input name="year" inputMode="numeric" placeholder="2027" />
-        </Field>
-        <Field label="Round" className="xl:col-span-2">
-          <Input name="round" inputMode="numeric" placeholder="1" />
-        </Field>
-        <Field label="Preferred branch" className="xl:col-span-2">
+        <Field label="Preferred branch" className="xl:col-span-3">
           <Input name="branch" placeholder="Computer, AI, Mechanical" />
         </Field>
         <div className="flex items-end xl:col-span-12">
@@ -149,6 +188,8 @@ export default function PredictorPage() {
             <Search size={18} />
             {loading ? "Checking..." : "Predict"}
           </Button>
+        </div>
+          </div>
         </div>
       </form>
 
@@ -165,15 +206,51 @@ export default function PredictorPage() {
               Target year {predictionMeta.prediction_year}; using historical years {(predictionMeta.history_years ?? []).join(", ") || "not yet available"}.
             </p>
           ) : null}
+          {predictionMeta?.history_years?.length ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedYear("all")}
+                className={`focus-ring min-h-10 rounded-lg border px-4 text-sm font-black ${selectedYear === "all" ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-white hover:bg-emerald-50"}`}
+              >
+                All years
+              </button>
+              {predictionMeta.history_years.map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  onClick={() => setSelectedYear(String(year))}
+                  className={`focus-ring min-h-10 rounded-lg border px-4 text-sm font-black ${selectedYear === String(year) ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-white hover:bg-emerald-50"}`}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {yearAnalysis.length ? (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {yearAnalysis.map((item) => (
+                <div key={item.year} className="rounded-xl border border-[var(--border)] bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-black">{item.year}</p>
+                    <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-black text-[var(--primary)]">{item.label}</span>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-[var(--muted)]">{item.reason}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <div className="grid gap-4 lg:grid-cols-3">
             {buckets.map((bucket) => (
               <section key={bucket} className="surface rounded-2xl p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <RankBadge bucket={bucket} />
-                  <span className="text-sm font-bold text-[var(--muted)]">{grouped[bucket]?.length ?? 0} matches</span>
+                  <span className="text-sm font-bold text-[var(--muted)]">{(selectedYear === "all" ? grouped[bucket] : groupedByYear[selectedYear]?.[bucket])?.length ?? 0} matches</span>
                 </div>
                 <div className="grid gap-3">
-                  {(grouped[bucket] ?? []).slice(0, 14).map((row) => (
+                  {((selectedYear === "all" ? grouped[bucket] : groupedByYear[selectedYear]?.[bucket]) ?? []).slice(0, 14).map((row) => (
                     <div key={row.id} className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm">
                       <p className="font-black">{row.institute_name_raw}</p>
                       <p className="mt-1 text-xs font-medium text-[var(--muted)]">{row.program_name_raw}</p>

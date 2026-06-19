@@ -25,7 +25,6 @@ export const EXAM_TYPE_OPTIONS: Option[] = [
 export const QUOTA_OPTIONS: Option[] = [
   { value: "All", label: "All quotas" },
   { value: "AI", label: "All India (AI)" },
-  { value: "HS", label: "Home State (HS)" },
   { value: "OS", label: "Other State (OS)" },
   { value: "GO", label: "Goa (GO)" },
   { value: "JK", label: "Jammu & Kashmir (JK)" },
@@ -35,17 +34,20 @@ export const QUOTA_OPTIONS: Option[] = [
 export const ALL_QUOTA_ONLY_OPTIONS: Option[] = [{ value: "AI", label: "All India (AI)" }];
 
 export const GENERAL_QUOTA_OPTIONS: Option[] = [
+  { value: "All", label: "All quotas" },
   { value: "AI", label: "All India (AI)" }
 ];
 
 export const NIT_QUOTA_OPTIONS: Option[] = [
+  { value: "All", label: "All quotas" },
   { value: "AI", label: "All India (AI)" },
   { value: "OS", label: "Other State (OS)" }
 ];
 
 export const NIT_HOME_STATE_QUOTA_OPTIONS: Option[] = [
-  ...NIT_QUOTA_OPTIONS,
-  { value: "HS", label: "Home State (HS)" }
+  { value: "All", label: "All quotas" },
+  { value: "AI", label: "All India (AI)" },
+  { value: "OS", label: "Other State (OS)" }
 ];
 
 export const GENDER_OPTIONS: Option[] = [
@@ -129,3 +131,71 @@ export function quotaOptionsForInstituteType(instituteType: string | undefined, 
 
   return GENERAL_QUOTA_OPTIONS;
 }
+
+export const NIT_STATE_PATTERNS: Record<string, string[]> = {
+  "Andhra Pradesh": ["Andhra Pradesh"],
+  "Arunachal Pradesh": ["Arunachal Pradesh"],
+  Assam: ["Silchar"],
+  Bihar: ["Patna"],
+  Chhattisgarh: ["Raipur"],
+  Delhi: ["Delhi"],
+  Goa: ["Goa"],
+  Gujarat: ["Surat", "SVNIT"],
+  Haryana: ["Kurukshetra"],
+  "Himachal Pradesh": ["Hamirpur"],
+  "Jammu and Kashmir": ["Srinagar"],
+  Jharkhand: ["Jamshedpur"],
+  Karnataka: ["Surathkal", "Karnataka"],
+  Kerala: ["Calicut"],
+  "Madhya Pradesh": ["Bhopal"],
+  Maharashtra: ["Nagpur"],
+  Manipur: ["Manipur"],
+  Meghalaya: ["Meghalaya"],
+  Mizoram: ["Mizoram"],
+  Nagaland: ["Nagaland"],
+  Odisha: ["Rourkela"],
+  Puducherry: ["Puducherry"],
+  Punjab: ["Jalandhar"],
+  Rajasthan: ["Jaipur"],
+  Sikkim: ["Sikkim"],
+  "Tamil Nadu": ["Tiruchirappalli", "Trichy"],
+  Telangana: ["Warangal"],
+  Tripura: ["Agartala"],
+  Uttarakhand: ["Uttarakhand"],
+  "Uttar Pradesh": ["Allahabad"],
+  "West Bengal": ["Durgapur"]
+};
+
+export const INDIA_STATE_OPTIONS: Option[] = [
+  { value: "Andhra Pradesh", label: "Andhra Pradesh" },
+  { value: "Arunachal Pradesh", label: "Arunachal Pradesh" },
+  { value: "Assam", label: "Assam" },
+  { value: "Bihar", label: "Bihar" },
+  { value: "Chhattisgarh", label: "Chhattisgarh" },
+  { value: "Delhi", label: "Delhi" },
+  { value: "Goa", label: "Goa" },
+  { value: "Gujarat", label: "Gujarat" },
+  { value: "Haryana", label: "Haryana" },
+  { value: "Himachal Pradesh", label: "Himachal Pradesh" },
+  { value: "Jammu and Kashmir", label: "Jammu and Kashmir" },
+  { value: "Jharkhand", label: "Jharkhand" },
+  { value: "Karnataka", label: "Karnataka" },
+  { value: "Kerala", label: "Kerala" },
+  { value: "Madhya Pradesh", label: "Madhya Pradesh" },
+  { value: "Maharashtra", label: "Maharashtra" },
+  { value: "Manipur", label: "Manipur" },
+  { value: "Meghalaya", label: "Meghalaya" },
+  { value: "Mizoram", label: "Mizoram" },
+  { value: "Nagaland", label: "Nagaland" },
+  { value: "Odisha", label: "Odisha" },
+  { value: "Puducherry", label: "Puducherry" },
+  { value: "Punjab", label: "Punjab" },
+  { value: "Rajasthan", label: "Rajasthan" },
+  { value: "Sikkim", label: "Sikkim" },
+  { value: "Tamil Nadu", label: "Tamil Nadu" },
+  { value: "Telangana", label: "Telangana" },
+  { value: "Tripura", label: "Tripura" },
+  { value: "Uttar Pradesh", label: "Uttar Pradesh" },
+  { value: "Uttarakhand", label: "Uttarakhand" },
+  { value: "West Bengal", label: "West Bengal" }
+];
