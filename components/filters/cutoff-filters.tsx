@@ -85,12 +85,6 @@ export function CutoffFilters() {
       <Field label="State" className="lg:col-span-2">
         <Input name="state" placeholder="Optional" defaultValue={currentValue(params, "state")} />
       </Field>
-      <Field label="Closing rank from" className="lg:col-span-2">
-        <Input name="rank_min" placeholder="Min" defaultValue={currentValue(params, "rank_min")} />
-      </Field>
-      <Field label="Closing rank to" className="lg:col-span-2">
-        <Input name="rank_max" placeholder="Max" defaultValue={currentValue(params, "rank_max")} />
-      </Field>
       <Field label="Sort results" className="lg:col-span-3">
         <Select name="sort" defaultValue={currentValue(params, "sort") || "closing_rank"}>
           <option value="closing_rank">Closing rank ascending</option>

@@ -37,6 +37,7 @@ export const predictQuerySchema = z.object({
   year: optionalInt,
   round: optionalInt,
   institute_type: z.string().optional(),
+  institute_values: z.string().optional(),
   state: z.string().optional(),
   quota: z.string().optional(),
   seat_type: z.string().optional(),

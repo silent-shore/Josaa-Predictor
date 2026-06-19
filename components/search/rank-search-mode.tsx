@@ -82,7 +82,7 @@ export function RankSearchMode({ year, round }: { year?: string; round?: string 
       {error ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-900">{error}</div> : null}
       {grouped ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {(["Safe", "Moderate", "Reach"] as const).map((bucket) => (
+          {(["Safe", "Moderate", "Risky"] as const).map((bucket) => (
             <div key={bucket} className="rounded-xl border border-[var(--border)] bg-white p-3">
               <div className="mb-2 flex items-center justify-between">
                 <RankBadge bucket={bucket} />

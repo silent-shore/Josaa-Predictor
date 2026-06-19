@@ -2,6 +2,7 @@ import type { CutoffRow } from "@/lib/cutoff-query";
 
 export type FilterOption = {
   value: string;
+  label?: string;
   count: number;
 };
 

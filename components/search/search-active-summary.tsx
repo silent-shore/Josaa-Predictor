@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import type { SearchFilters } from "@/components/search/types";
 
-const labels: Record<keyof SearchFilters, string> = {
+const labels: Partial<Record<keyof SearchFilters, string>> = {
   exam_type: "Exam",
   year: "Year",
   round: "Round",
@@ -18,8 +18,6 @@ const labels: Record<keyof SearchFilters, string> = {
   state: "State",
   opening_min: "Opening min",
   opening_max: "Opening max",
-  rank_min: "Closing min",
-  rank_max: "Closing max",
   sort: "Sort",
   page: "Page"
 };
@@ -39,7 +37,7 @@ export function SearchActiveSummary({
 }) {
   const chips: Array<{ key: keyof SearchFilters; value: string }> = [];
   for (const [key, value] of Object.entries(filters) as Array<[keyof SearchFilters, string | string[] | undefined]>) {
-    if (!value || key === "page" || key === "sort") continue;
+    if (!value || key === "page" || key === "sort" || key === "rank_min" || key === "rank_max") continue;
     if (Array.isArray(value)) {
       value.forEach((item) => chips.push({ key, value: item }));
     } else {

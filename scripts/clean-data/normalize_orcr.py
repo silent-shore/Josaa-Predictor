@@ -5,6 +5,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -13,10 +14,48 @@ from utils.rank_utils import parse_rank
 
 
 REQUIRED = ["year", "round", "institute_name", "institute_type", "program_name", "quota", "seat_type", "gender", "opening_rank", "closing_rank"]
+EXCLUDED_PROGRAM_RE = re.compile(r"\b(architecture|planning)\b", re.IGNORECASE)
+
+BRANCH_GROUP_KEYWORDS = [
+    ("cs-ai-data-it", ["computer science", "computer engineering", "cse", "information technology", "artificial intelligence", "artificial intelligenece", "artificial lntelligence", "machine learning", "aiml", "computing", "data science", "data analytics", "data engineering", "computational", "cyber security", "internet of things", "block chain", "quantum technologies", "human computer", "gaming technology", "business informatics"]),
+    ("ece-electronics", ["electronics", "electronic", "communication", "ece", "vlsi", "microelectronics", "telecommunication", "instrumentation", "embedded", "signal processing", "photonics"]),
+    ("electrical", ["electrical", "eee", "power", "energy", "control", "instrumentation"]),
+    ("mechanical", ["mechanical", "manufacturing", "industrial", "production", "automobile", "automotive", "mechatronics", "thermal"]),
+    ("civil", ["civil", "construction", "infrastructure", "transportation", "environmental engineering"]),
+    ("chemical", ["chemical", "biochemical", "process", "petroleum", "oil", "polymer", "plastic", "food process"]),
+    ("materials-metallurgy", ["materials", "metallurgical", "metallurgy", "mining", "mineral", "ceramic", "textile"]),
+    ("biotech", ["biotechnology", "bio technology", "biomedical", "bio engineering", "bioengineering", "biological", "bioscience", "bio science", "life science"]),
+    ("aerospace", ["aerospace", "aeronautical", "aviation", "aircraft"]),
+    ("physics-math-science", ["engineering physics", "physics", "mathematics", "statistics", "chemistry", "economics", "quantitative", "applied geology", "exploration geophysics", "earth sciences"]),
+    ("marine-ocean", ["marine", "naval", "ocean", "ship"]),
+]
 
 
 def normalized_program(name: str) -> str:
     return " ".join(name.lower().replace(",", " ").split())
+
+
+def branch_group_index(program_name: str) -> int:
+    value = program_name.lower()
+    for index, (_, keywords) in enumerate(BRANCH_GROUP_KEYWORDS):
+        if any(keyword in value for keyword in keywords):
+            return index
+    return len(BRANCH_GROUP_KEYWORDS)
+
+
+def row_sort_key(row: dict[str, str]) -> tuple[object, ...]:
+    return (
+        int(row.get("year") or 0),
+        int(row.get("round") or 0),
+        row.get("institute_type", ""),
+        row.get("institute_name", ""),
+        branch_group_index(row.get("program_name", "")),
+        row.get("program_name", ""),
+        row.get("quota", ""),
+        row.get("seat_type", ""),
+        row.get("gender", ""),
+        int(row.get("closing_rank_num") or 0),
+    )
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -41,34 +80,42 @@ def normalize_file(input_path: Path, output_path: Path, *, source_url: str = "")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     invalid = 0
+    normalized_rows: list[dict[str, object]] = []
+    for row in rows:
+        if EXCLUDED_PROGRAM_RE.search(str(row.get("program_name", ""))):
+            invalid += 1
+            continue
+
+        missing = [field for field in REQUIRED if not str(row.get(field, "")).strip()]
+        if missing:
+            invalid += 1
+            continue
+
+        opening = parse_rank(row["opening_rank"])
+        closing = parse_rank(row["closing_rank"])
+        if closing.numeric is None:
+            invalid += 1
+            continue
+
+        stable_payload = json.dumps(row, sort_keys=True, ensure_ascii=False)
+        normalized_rows.append(
+            {
+                **{field: str(row.get(field, "")).strip() for field in REQUIRED},
+                "opening_rank_num": opening.numeric or "",
+                "closing_rank_num": closing.numeric,
+                "rank_suffix": closing.suffix or opening.suffix or "",
+                "rank_list_type": str(row.get("rank_list_type") or row.get("seat_type") or "").strip(),
+                "normalized_program_name": normalized_program(str(row.get("program_name", ""))),
+                "source_url": str(row.get("source_url") or source_url).strip(),
+                "source_hash": hashlib.sha256(stable_payload.encode("utf-8")).hexdigest(),
+            }
+        )
+
+    normalized_rows.sort(key=row_sort_key)
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=output_fields)
         writer.writeheader()
-        for row in rows:
-            missing = [field for field in REQUIRED if not str(row.get(field, "")).strip()]
-            if missing:
-                invalid += 1
-                continue
-
-            opening = parse_rank(row["opening_rank"])
-            closing = parse_rank(row["closing_rank"])
-            if closing.numeric is None:
-                invalid += 1
-                continue
-
-            stable_payload = json.dumps(row, sort_keys=True, ensure_ascii=False)
-            writer.writerow(
-                {
-                    **{field: str(row.get(field, "")).strip() for field in REQUIRED},
-                    "opening_rank_num": opening.numeric or "",
-                    "closing_rank_num": closing.numeric,
-                    "rank_suffix": closing.suffix or opening.suffix or "",
-                    "rank_list_type": str(row.get("rank_list_type") or row.get("seat_type") or "").strip(),
-                    "normalized_program_name": normalized_program(str(row.get("program_name", ""))),
-                    "source_url": str(row.get("source_url") or source_url).strip(),
-                    "source_hash": hashlib.sha256(stable_payload.encode("utf-8")).hexdigest(),
-                }
-            )
+        writer.writerows(normalized_rows)
 
     return {
         "input": str(input_path),

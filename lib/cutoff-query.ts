@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
 import type { cutoffsQuerySchema } from "@/lib/validators/cutoffs";
-import { instituteTypesForExam, NIT_STATE_PATTERNS, normalizeInstituteTypeFilter } from "@/lib/constants";
+import { branchGroupByValue, isBranchGroupValue, instituteTypesForExam, NIT_STATE_PATTERNS, normalizeInstituteTypeFilter } from "@/lib/constants";
 
 export type CutoffQuery = z.infer<typeof cutoffsQuerySchema>;
 
@@ -79,6 +79,26 @@ function applyHomeStateInstituteFilter(query: any, state: string | undefined) {
   return query.or(patterns.map((pattern) => `institute_name_raw.ilike.*${pattern}*`).join(","));
 }
 
+function applyProgramValueFilter(query: any, selectedPrograms: string[] | undefined) {
+  if (!selectedPrograms?.length) return query;
+  const groupedKeywords = selectedPrograms.flatMap((value) => isBranchGroupValue(value) ? branchGroupByValue(value)?.keywords ?? [] : []);
+  const exactPrograms = selectedPrograms.filter((value) => !isBranchGroupValue(value));
+
+  if (groupedKeywords.length && !exactPrograms.length) {
+    return query.or(groupedKeywords.map((keyword) => `program_name_raw.ilike.*${keyword}*`).join(","));
+  }
+
+  if (!groupedKeywords.length) {
+    return query.in("program_name_raw", exactPrograms);
+  }
+
+  const exactKeywords = exactPrograms
+    .map((program) => program.split("(", 1)[0].trim())
+    .filter(Boolean);
+  const keywords = [...groupedKeywords, ...exactKeywords];
+  return query.or(keywords.map((keyword) => `program_name_raw.ilike.*${keyword}*`).join(","));
+}
+
 export function applyCutoffFilters(client: SupabaseClient, filters: CutoffQuery) {
   const instituteTypes = effectiveInstituteTypes(filters);
   const shouldFilterInstituteRelation =
@@ -110,7 +130,7 @@ export function applyCutoffFilters(client: SupabaseClient, filters: CutoffQuery)
   if (filters.institute) query = query.ilike("institute_name_raw", `%${filters.institute}%`);
   if (selectedInstitutes?.length) query = query.in("institute_name_raw", selectedInstitutes);
   if (filters.program) query = query.ilike("program_name_raw", `%${filters.program}%`);
-  if (selectedPrograms?.length) query = query.in("program_name_raw", selectedPrograms);
+  query = applyProgramValueFilter(query, selectedPrograms);
   if (shouldApplyQuota(filters) && selectedQuotas?.length) query = query.in("quota", selectedQuotas);
   if (selectedSeatTypes?.length && !selectedSeatTypes.includes("All")) query = query.in("seat_type", selectedSeatTypes);
   if (selectedGenders?.length && !selectedGenders.includes("All")) query = query.in("gender", selectedGenders);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { effectiveInstituteTypes, shouldApplyQuota } from "@/lib/cutoff-query";
-import { NIT_STATE_PATTERNS } from "@/lib/constants";
+import { branchGroupByValue, isBranchGroupValue, isExcludedProgramName, NIT_STATE_PATTERNS, PREDICTOR_THRESHOLDS } from "@/lib/constants";
 import { classifyRank } from "@/lib/predictor";
 import { createClient } from "@/lib/supabase/server";
 import { predictQuerySchema } from "@/lib/validators/cutoffs";
@@ -12,19 +12,23 @@ function applyHomeStateInstituteFilter(query: any, state: string | undefined) {
   return query.or(patterns.map((pattern) => `institute_name_raw.ilike.*${pattern}*`).join(","));
 }
 
-function median(values: number[]) {
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
-}
-
-function strictnessLabel(yearMedian: number | null, overallMedian: number | null) {
-  if (!yearMedian || !overallMedian) return "Insufficient data";
-  const delta = ((yearMedian - overallMedian) / overallMedian) * 100;
-  if (delta <= -5) return "Strict";
-  if (delta >= 5) return "Relaxed";
-  return "Near average";
+function applyBranchFilter(query: any, branch: string | undefined) {
+  if (!branch) return query;
+  const branches = branch
+    .split("~")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!branches.length) return query;
+  const groupedKeywords = branches.flatMap((item) => isBranchGroupValue(item) ? branchGroupByValue(item)?.keywords ?? [] : []);
+  const exactPrograms = branches.filter((item) => !isBranchGroupValue(item));
+  if (!groupedKeywords.length && exactPrograms.length === 1) return query.ilike("program_name_raw", `%${exactPrograms[0]}%`);
+  if (!groupedKeywords.length) return query.in("program_name_raw", exactPrograms);
+  const exactKeywords = exactPrograms
+    .map((program) => program.split("(", 1)[0].trim())
+    .filter(Boolean);
+  const keywords = [...groupedKeywords, ...exactKeywords];
+  if (keywords.length === 1) return query.ilike("program_name_raw", `%${keywords[0]}%`);
+  return query.or(keywords.map((item) => `program_name_raw.ilike.*${item}*`).join(","));
 }
 
 export async function GET(request: NextRequest) {
@@ -59,62 +63,55 @@ export async function GET(request: NextRequest) {
   const instituteSelect = shouldFilterInstituteRelation
     ? "institutes!inner(institute_type,state)"
     : "institutes(institute_type,state)";
-  let query = supabase
-    .from("josaa_cutoffs")
-    .select(`id,year,round,institute_name_raw,program_name_raw,quota,seat_type,gender,opening_rank_raw,closing_rank_raw,closing_rank_num,rank_list_type,${instituteSelect}`)
-    .not("closing_rank_num", "is", null)
-    .gte("year", historyStartYear)
-    .lte("year", historyEndYear)
-    .lte("closing_rank_num", Math.ceil(filters.rank * 1.25))
-    .order("closing_rank_num", { ascending: false })
-    .limit(1200);
+  const minimumNearbyClosingRank = Math.floor(filters.rank / PREDICTOR_THRESHOLDS.risky);
 
-  if (filters.round) query = query.eq("round", filters.round);
-  if (instituteTypes?.length) query = query.in("institutes.institute_type", instituteTypes);
-  if (filters.state) query = applyHomeStateInstituteFilter(query, filters.state);
-  if (shouldApplyQuota(filters)) query = query.eq("quota", filters.quota);
-  if (filters.seat_type && filters.seat_type !== "All") query = query.eq("seat_type", filters.seat_type);
-  if (filters.gender && filters.gender !== "All") query = query.eq("gender", filters.gender);
-  if (filters.branch) query = query.ilike("program_name_raw", `%${filters.branch}%`);
+  function buildRowsQuery(from: number, to: number) {
+    let query = supabase
+      .from("josaa_cutoffs")
+      .select(`id,year,round,institute_name_raw,program_name_raw,quota,seat_type,gender,opening_rank_raw,closing_rank_raw,closing_rank_num,rank_list_type,${instituteSelect}`)
+      .not("closing_rank_num", "is", null)
+      .gte("year", historyStartYear)
+      .lte("year", historyEndYear)
+      .gte("closing_rank_num", minimumNearbyClosingRank)
+      .order("closing_rank_num", { ascending: true })
+      .range(from, to);
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (filters.round) query = query.eq("round", filters.round);
+    if (instituteTypes?.length) query = query.in("institutes.institute_type", instituteTypes);
+    if (filters.state) query = applyHomeStateInstituteFilter(query, filters.state);
+    if (filters.institute_values) query = query.in("institute_name_raw", filters.institute_values.split("~").filter(Boolean));
+    if (shouldApplyQuota(filters)) query = query.eq("quota", filters.quota);
+    if (filters.seat_type && filters.seat_type !== "All") query = query.eq("seat_type", filters.seat_type);
+    if (filters.gender && filters.gender !== "All") query = query.eq("gender", filters.gender);
+    return applyBranchFilter(query, filters.branch);
+  }
 
-  const grouped = { Safe: [], Moderate: [], Reach: [] } as Record<string, unknown[]>;
+  const data: any[] = [];
+  const pageSize = 1000;
+  for (let page = 0; page < 12; page += 1) {
+    const from = page * pageSize;
+    const { data: rows, error } = await buildRowsQuery(from, from + pageSize - 1);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    data.push(...(rows ?? []));
+    if (!rows || rows.length < pageSize) break;
+  }
+
+  const grouped = { Safe: [], Moderate: [], Risky: [] } as Record<string, unknown[]>;
   const groupedByYear: Record<string, Record<string, unknown[]>> = {};
-  for (const row of data ?? []) {
+  for (const row of data) {
+    if (isExcludedProgramName(row.program_name_raw as string)) continue;
     const bucket = classifyRank(filters.rank, row.closing_rank_num as number);
     if (bucket) {
       grouped[bucket].push(row);
       const yearKey = String(row.year);
-      groupedByYear[yearKey] ??= { Safe: [], Moderate: [], Reach: [] };
+      groupedByYear[yearKey] ??= { Safe: [], Moderate: [], Risky: [] };
       groupedByYear[yearKey][bucket].push(row);
     }
   }
 
-  const overallMedian = median((data ?? []).map((row) => row.closing_rank_num as number));
-  const year_analysis = availableYears
-    .filter((year) => year >= historyStartYear && year <= historyEndYear)
-    .map((year) => {
-      const yearRows = (data ?? []).filter((row) => row.year === year);
-      const yearMedian = median(yearRows.map((row) => row.closing_rank_num as number));
-      const deltaPercent = yearMedian && overallMedian ? Number((((yearMedian - overallMedian) / overallMedian) * 100).toFixed(1)) : null;
-      return {
-        year,
-        median_closing_rank: yearMedian,
-        comparison_median: overallMedian,
-        delta_percent: deltaPercent,
-        label: strictnessLabel(yearMedian, overallMedian),
-        reason: yearMedian && overallMedian
-          ? `${year} median closing rank was ${Math.abs(deltaPercent ?? 0)}% ${deltaPercent && deltaPercent < 0 ? "lower" : "higher"} than the five-year median, so this year looks ${strictnessLabel(yearMedian, overallMedian).toLowerCase()}.`
-          : "Not enough matching rows to compare this year."
-      };
-    });
-
   return NextResponse.json({
     grouped,
     grouped_by_year: groupedByYear,
-    year_analysis,
     prediction_year: predictionYear,
     history_years: availableYears.filter((year) => year >= historyStartYear && year <= historyEndYear),
     explanation: "This is based only on previous OR-CR data and cannot guarantee admission."

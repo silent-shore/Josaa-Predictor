@@ -12,8 +12,6 @@ const labels: Record<string, string> = {
   quota: "Quota",
   seat_type: "Seat type",
   gender: "Gender",
-  rank_min: "Closing min",
-  rank_max: "Closing max",
   sort: "Sort"
 };
 
@@ -24,7 +22,7 @@ export function ActiveFilterChips({
   params: Record<string, string | undefined>;
   basePath: string;
 }) {
-  const hiddenKeys = new Set(["page", "page_size"]);
+  const hiddenKeys = new Set(["page", "page_size", "rank_min", "rank_max"]);
   const entries = Object.entries(params).filter(([key, value]) => !hiddenKeys.has(key) && value && value !== "All");
 
   if (!entries.length) {

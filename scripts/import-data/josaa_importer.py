@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import ssl
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -33,6 +34,8 @@ def load_local_env() -> None:
 
 
 load_local_env()
+
+EXCLUDED_PROGRAM_RE = re.compile(r"\b(architecture|planning)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -75,7 +78,10 @@ class CutoffInput(BaseModel):
 
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle))
+        return [
+            row for row in csv.DictReader(handle)
+            if not EXCLUDED_PROGRAM_RE.search(str(row.get("program_name", "")))
+        ]
 
 
 def validate_rows(raw_rows: list[dict[str, str]]) -> tuple[list[CutoffInput], ImportValidation]:

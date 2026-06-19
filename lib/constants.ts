@@ -82,8 +82,161 @@ export const SEAT_TYPES = SEAT_TYPE_OPTIONS.map((option) => option.value);
 export const PREDICTOR_THRESHOLDS = {
   safe: 0.9,
   moderate: 1.05,
-  reach: 1.2
+  risky: 1.2
 } as const;
+
+export const BRANCH_GROUP_PREFIX = "branch_group:";
+
+export type BranchGroup = {
+  value: string;
+  label: string;
+  keywords: string[];
+};
+
+function branchGroup(value: string, label: string, keywords: string[]): BranchGroup {
+  return { value: `${BRANCH_GROUP_PREFIX}${value}`, label, keywords };
+}
+
+export const BRANCH_GROUPS: BranchGroup[] = [
+  branchGroup("computer-ai-data-it", "CS / CSE / AI / Data Science / IT", [
+    "Computer Science",
+    "Computer Engineering",
+    "CSE",
+    "Information Technology",
+    "Artificial Intelligence",
+    "Artificial Intelligenece",
+    "Artificial lntelligence",
+    "Machine Learning",
+    "AIML",
+    "Computing",
+    "Data Science",
+    "Data Analytics",
+    "Data Engineering",
+    "Computational",
+    "Cyber Security",
+    "Internet of Things",
+    "Block Chain",
+    "Quantum Technologies",
+    "Human Computer",
+    "Gaming Technology",
+    "Business Informatics"
+  ]),
+  branchGroup("electronics-communication", "ECE / Electronics / Communication / VLSI", [
+    "Electronics",
+    "Electronic",
+    "Communication",
+    "ECE",
+    "VLSI",
+    "Microelectronics",
+    "Telecommunication",
+    "Instrumentation",
+    "Embedded",
+    "Signal Processing",
+    "Photonics"
+  ]),
+  branchGroup("electrical", "Electrical / EEE / Power", [
+    "Electrical",
+    "EEE",
+    "Power",
+    "Energy",
+    "Control",
+    "Instrumentation"
+  ]),
+  branchGroup("mechanical", "Mechanical / Manufacturing / Industrial", [
+    "Mechanical",
+    "Manufacturing",
+    "Industrial",
+    "Production",
+    "Automobile",
+    "Automotive",
+    "Mechatronics",
+    "Thermal"
+  ]),
+  branchGroup("civil", "Civil / Construction / Infrastructure", [
+    "Civil",
+    "Construction",
+    "Infrastructure",
+    "Transportation",
+    "Environmental Engineering"
+  ]),
+  branchGroup("chemical", "Chemical / Biochemical / Process", [
+    "Chemical",
+    "Biochemical",
+    "Process",
+    "Petroleum",
+    "Oil",
+    "Polymer",
+    "Plastic",
+    "Food Process"
+  ]),
+  branchGroup("materials-metallurgy", "Materials / Metallurgy / Mining", [
+    "Materials",
+    "Metallurgical",
+    "Metallurgy",
+    "Mining",
+    "Mineral",
+    "Ceramic",
+    "Textile"
+  ]),
+  branchGroup("biotech-bioengineering", "Biotechnology / Biomedical / Biosciences", [
+    "Biotechnology",
+    "Bio Technology",
+    "Biomedical",
+    "Bio Engineering",
+    "Bioengineering",
+    "Biological",
+    "Bioscience",
+    "Bio Science",
+    "Life Science"
+  ]),
+  branchGroup("aerospace", "Aerospace / Aeronautical / Aviation", [
+    "Aerospace",
+    "Aeronautical",
+    "Aviation",
+    "Aircraft"
+  ]),
+  branchGroup("physics-math-science", "Physics / Mathematics / Sciences", [
+    "Engineering Physics",
+    "Physics",
+    "Mathematics",
+    "Statistics",
+    "Chemistry",
+    "Economics",
+    "Quantitative",
+    "Applied Geology",
+    "Exploration Geophysics",
+    "Earth Sciences"
+  ]),
+  branchGroup("marine-ocean", "Marine / Naval / Ocean", [
+    "Marine",
+    "Naval",
+    "Ocean",
+    "Ship"
+  ])
+];
+
+export function branchGroupByValue(value: string | undefined) {
+  return BRANCH_GROUPS.find((group) => group.value === value);
+}
+
+export function isBranchGroupValue(value: string | undefined) {
+  return Boolean(value?.startsWith(BRANCH_GROUP_PREFIX));
+}
+
+export function isExcludedProgramName(value: string | undefined) {
+  return /\b(architecture|planning)\b/i.test(value ?? "");
+}
+
+export function programMatchesBranchGroup(programName: string, group: BranchGroup) {
+  const lower = programName.toLowerCase();
+  return group.keywords.some((keyword) => lower.includes(keyword.toLowerCase()));
+}
+
+export function branchGroupIndexForProgram(programName: string | undefined) {
+  const value = programName ?? "";
+  const index = BRANCH_GROUPS.findIndex((group) => programMatchesBranchGroup(value, group));
+  return index === -1 ? BRANCH_GROUPS.length : index;
+}
 
 export function normalizeInstituteTypeFilter(value: string | undefined) {
   const aliases: Record<string, string> = {

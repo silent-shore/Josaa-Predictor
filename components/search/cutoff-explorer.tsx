@@ -8,7 +8,7 @@ import { RoundTrendModal } from "@/components/search/round-trend-modal";
 import type { CutoffMeta, CutoffResponse, SearchFilters } from "@/components/search/types";
 import { Button } from "@/components/ui/button";
 import type { CutoffRow } from "@/lib/cutoff-query";
-import { EXAM_TYPE_OPTIONS, GENDER_OPTIONS, INDIA_STATE_OPTIONS, INSTITUTE_TYPE_OPTIONS, quotaOptionsForInstituteType, SEAT_TYPE_OPTIONS } from "@/lib/constants";
+import { EXAM_TYPE_OPTIONS, GENDER_OPTIONS, INDIA_STATE_OPTIONS, INSTITUTE_TYPE_OPTIONS, isExcludedProgramName, quotaOptionsForInstituteType, SEAT_TYPE_OPTIONS } from "@/lib/constants";
 
 const arrayKeys = ["institute_type", "institute_values", "program_values", "quota", "seat_type", "gender"] as const;
 
@@ -58,10 +58,6 @@ function compactLabel(value: string) {
     .replace("National Institute of Technology", "NIT")
     .replace("Indian Institute of Information Technology", "IIIT")
     .replace("Government Funded Technical Institutions", "GFTI");
-}
-
-function isHiddenBranch(value: string) {
-  return /\b(architecture|planning)\b/i.test(value);
 }
 
 function ToggleMark({ checked }: { checked: boolean }) {
@@ -207,9 +203,6 @@ export function CutoffExplorer() {
   const hasNit = selectedTypes.includes("NIT");
   const quotaLockedToAI = filters.exam_type === "JEE Advanced" || (selectedTypes.length > 0 && selectedTypes.every((type) => aiOnlyTypes.includes(type)));
   const quotaOptions = quotaLockedToAI ? quotaOptionsForInstituteType("IIT") : hasNit ? quotaOptionsForInstituteType("NIT", Boolean(filters.state)) : quotaOptionsForInstituteType(selectedTypes.length === 1 ? selectedType : undefined, Boolean(filters.state));
-  const homeStateMessage = hasNit
-    ? "Home State applies to NITs in the selected state."
-    : "Home State is unavailable for IIT, IIIT and GFTI-only selections; those options use All India style quotas.";
   const typeOptions = filters.exam_type === "JEE Advanced"
     ? INSTITUTE_TYPE_OPTIONS.filter((option) => option.value === "IIT")
     : INSTITUTE_TYPE_OPTIONS.filter((option) => ["NIT", "IIIT", "GFTI"].includes(option.value));
@@ -479,14 +472,13 @@ export function CutoffExplorer() {
                   <option value="">{hasNit ? "Select NIT home state" : "Select NIT to use HS quota"}</option>
                   {INDIA_STATE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <span className="text-xs font-semibold text-[var(--muted)]">{homeStateMessage}</span>
               </label>
               <div className="xl:col-span-3">
                 <OptionFlyout
                   id="branches"
                   label="Branches"
                   valueLabel={filters.program_values.length ? `${filters.program_values.length} selected` : metaLoading ? "Loading branches..." : "All matching branches"}
-                  options={(meta?.options.program ?? []).filter((option) => !isHiddenBranch(option.value)).map((option) => ({ value: option.value, label: option.value, count: option.count }))}
+                  options={(meta?.options.program ?? []).filter((option) => !isExcludedProgramName(option.value)).map((option) => ({ value: option.value, label: option.label ?? option.value, count: option.count }))}
                   selected={filters.program_values}
                   onChange={(next) => patch({ program_values: next, program: undefined })}
                   openId={openFlyout}

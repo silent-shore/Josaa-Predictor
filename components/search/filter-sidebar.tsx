@@ -66,16 +66,6 @@ export function FilterSidebar({
               <input className="focus-ring min-h-10 rounded-lg border border-[var(--border)] bg-[#fffdf9] px-3 text-sm font-semibold" value={filters.opening_max ?? ""} onChange={(event) => onPatch({ opening_max: event.target.value, page: "1" })} inputMode="numeric" />
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-[var(--muted)]">Closing min</span>
-              <input className="focus-ring min-h-10 rounded-lg border border-[var(--border)] bg-[#fffdf9] px-3 text-sm font-semibold" value={filters.rank_min ?? ""} onChange={(event) => onPatch({ rank_min: event.target.value, page: "1" })} inputMode="numeric" />
-            </label>
-            <label className="grid gap-1.5">
-              <span className="text-xs font-black uppercase tracking-wide text-[var(--muted)]">Closing max</span>
-              <input className="focus-ring min-h-10 rounded-lg border border-[var(--border)] bg-[#fffdf9] px-3 text-sm font-semibold" value={filters.rank_max ?? ""} onChange={(event) => onPatch({ rank_max: event.target.value, page: "1" })} inputMode="numeric" />
-            </label>
-          </div>
         </div>
       </div>
     </aside>

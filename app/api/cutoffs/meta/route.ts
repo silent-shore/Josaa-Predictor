@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { effectiveInstituteTypes, shouldApplyQuota, splitFilterValues } from "@/lib/cutoff-query";
-import { NIT_STATE_PATTERNS } from "@/lib/constants";
+import { BRANCH_GROUPS, branchGroupByValue, branchGroupIndexForProgram, isBranchGroupValue, isExcludedProgramName, NIT_STATE_PATTERNS, programMatchesBranchGroup } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { cutoffsQuerySchema } from "@/lib/validators/cutoffs";
 
 type OptionCount = {
   value: string;
+  label?: string;
   count: number;
 };
 
@@ -36,6 +37,34 @@ function applyHomeStateInstituteFilter(query: any, state: string | undefined) {
   const patterns = NIT_STATE_PATTERNS[state] ?? [];
   if (!patterns.length) return query;
   return query.or(patterns.map((pattern) => `institute_name_raw.ilike.*${pattern}*`).join(","));
+}
+
+function applyProgramValueFilter(query: any, selectedPrograms: string[] | undefined) {
+  if (!selectedPrograms?.length) return query;
+  const groupedKeywords = selectedPrograms.flatMap((value) => isBranchGroupValue(value) ? branchGroupByValue(value)?.keywords ?? [] : []);
+  const exactPrograms = selectedPrograms.filter((value) => !isBranchGroupValue(value));
+
+  if (groupedKeywords.length && !exactPrograms.length) {
+    return query.or(groupedKeywords.map((keyword) => `program_name_raw.ilike.*${keyword}*`).join(","));
+  }
+
+  if (!groupedKeywords.length) {
+    return query.in("program_name_raw", exactPrograms);
+  }
+
+  const exactKeywords = exactPrograms
+    .map((program) => program.split("(", 1)[0].trim())
+    .filter(Boolean);
+  const keywords = [...groupedKeywords, ...exactKeywords];
+  return query.or(keywords.map((keyword) => `program_name_raw.ilike.*${keyword}*`).join(","));
+}
+
+function branchGroupOptions(rows: Array<Record<string, unknown>>): OptionCount[] {
+  return BRANCH_GROUPS.map((group) => ({
+    value: group.value,
+    label: group.label,
+    count: rows.filter((row) => typeof row.program_name_raw === "string" && programMatchesBranchGroup(row.program_name_raw, group)).length
+  })).filter((option) => option.count > 0);
 }
 
 export async function GET(request: NextRequest) {
@@ -115,7 +144,7 @@ export async function GET(request: NextRequest) {
     if (filters.institute) query = query.ilike("institute_name_raw", `%${filters.institute}%`);
     if (filters.program) query = query.ilike("program_name_raw", `%${filters.program}%`);
     if (selectedInstitutes?.length) query = query.in("institute_name_raw", selectedInstitutes);
-    if (selectedPrograms?.length) query = query.in("program_name_raw", selectedPrograms);
+    query = applyProgramValueFilter(query, selectedPrograms);
     if (shouldApplyQuota(filters) && selectedQuotas?.length) query = query.in("quota", selectedQuotas);
     if (selectedSeatTypes?.length && !selectedSeatTypes.includes("All")) query = query.in("seat_type", selectedSeatTypes);
     if (selectedGenders?.length && !selectedGenders.includes("All")) query = query.in("gender", selectedGenders);
@@ -134,7 +163,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    rows.push(...((data ?? []) as Array<Record<string, unknown>>));
+    rows.push(...((data ?? []) as Array<Record<string, unknown>>).filter((row) => !isExcludedProgramName(row.program_name_raw as string)));
     if (!data || data.length < pageSize) break;
   }
 
@@ -155,7 +184,12 @@ export async function GET(request: NextRequest) {
         "institute_type"
       ),
       institute: countBy(rows, "institute_name_raw"),
-      program: countBy(rows, "program_name_raw"),
+      program: [
+        ...branchGroupOptions(rows),
+        ...countBy(rows, "program_name_raw")
+          .filter((option) => !isExcludedProgramName(option.value))
+          .sort((a, b) => branchGroupIndexForProgram(a.value) - branchGroupIndexForProgram(b.value) || a.value.localeCompare(b.value))
+      ],
       quota: countBy(rows, "quota"),
       seat_type: countBy(rows, "seat_type"),
       gender: countBy(rows, "gender"),
