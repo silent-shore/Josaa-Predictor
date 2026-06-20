@@ -365,7 +365,7 @@ export function CutoffExplorer() {
           <div className="bg-gradient-to-br from-white via-[#fbfaf7] to-[#e7f5f1] p-6 lg:p-8">
             <div>
               <p className="eyebrow">Opening and closing ranks</p>
-              <h1 className="mt-3 text-4xl font-black tracking-normal text-[#001d19] sm:text-5xl">JoSAA Rank Explorer</h1>
+              <h1 className="mt-3 text-4xl font-black tracking-normal text-[#001d19] sm:text-5xl">RankRoute</h1>
             </div>
           </div>
         </section>

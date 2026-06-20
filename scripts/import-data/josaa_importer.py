@@ -5,11 +5,12 @@ import json
 import os
 import re
 import ssl
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -36,6 +37,9 @@ def load_local_env() -> None:
 load_local_env()
 
 EXCLUDED_PROGRAM_RE = re.compile(r"\b(architecture|planning)\b", re.IGNORECASE)
+SUPABASE_TIMEOUT_SECONDS = int(os.environ.get("SUPABASE_REST_TIMEOUT", "180"))
+SUPABASE_RETRIES = int(os.environ.get("SUPABASE_REST_RETRIES", "4"))
+SUPABASE_CHUNK_SIZE = int(os.environ.get("SUPABASE_IMPORT_CHUNK_SIZE", "250"))
 
 
 @dataclass
@@ -128,17 +132,37 @@ def supabase_rest_request(
         headers["Prefer"] = prefer
 
     request = Request(endpoint, data=payload, headers=headers, method=method)
-    try:
-        context = ssl.create_default_context(cafile=certifi.where())
-        with urlopen(request, timeout=60, context=context) as response:
-            if count_only:
-                content_range = response.headers.get("content-range", "0-0/0")
-                return int(content_range.rsplit("/", 1)[-1])
-            text = response.read().decode("utf-8")
-            return json.loads(text) if text else None
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8")
-        raise RuntimeError(f"Supabase REST request failed for {table}: {exc.code} {detail}") from exc
+    context = ssl.create_default_context(cafile=certifi.where())
+    last_error: Exception | None = None
+    for attempt in range(1, SUPABASE_RETRIES + 1):
+        try:
+            with urlopen(request, timeout=SUPABASE_TIMEOUT_SECONDS, context=context) as response:
+                if count_only:
+                    content_range = response.headers.get("content-range", "0-0/0")
+                    return int(content_range.rsplit("/", 1)[-1])
+                text = response.read().decode("utf-8")
+                return json.loads(text) if text else None
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8")
+            if exc.code not in {429, 500, 502, 503, 504} or attempt == SUPABASE_RETRIES:
+                raise RuntimeError(f"Supabase REST request failed for {table}: {exc.code} {detail}") from exc
+            last_error = RuntimeError(f"{exc.code} {detail}")
+        except (TimeoutError, URLError, OSError) as exc:
+            if attempt == SUPABASE_RETRIES:
+                raise RuntimeError(
+                    f"Supabase REST request failed for {table} after {SUPABASE_RETRIES} attempts: {exc}"
+                ) from exc
+            last_error = exc
+
+        sleep_for = min(30, 2**attempt)
+        print(
+            f"Supabase request retry {attempt}/{SUPABASE_RETRIES} for {table} after {last_error}; "
+            f"sleeping {sleep_for}s",
+            flush=True,
+        )
+        time.sleep(sleep_for)
+
+    raise RuntimeError(f"Supabase REST request failed for {table}: {last_error}")
 
 
 def upsert_returning_id(table: str, payload: dict[str, Any], on_conflict: str) -> str:
@@ -251,8 +275,8 @@ def import_csv(
         )
 
     inserted = 0
-    for start in range(0, len(cutoff_rows), 500):
-        chunk = cutoff_rows[start : start + 500]
+    for start in range(0, len(cutoff_rows), SUPABASE_CHUNK_SIZE):
+        chunk = cutoff_rows[start : start + SUPABASE_CHUNK_SIZE]
         supabase_rest_request(
             "josaa_cutoffs",
             method="POST",
@@ -261,6 +285,8 @@ def import_csv(
             prefer="resolution=merge-duplicates,return=minimal",
         )
         inserted += len(chunk)
+        if inserted % 5000 == 0 or inserted == len(cutoff_rows):
+            print(f"Imported/upserted {inserted}/{len(cutoff_rows)} cutoff rows", flush=True)
 
     latest = max(valid, key=lambda item: (item.year, item.round), default=None)
     if latest:

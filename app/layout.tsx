@@ -6,7 +6,7 @@ import "./globals.css";
 import { Disclaimer } from "@/components/disclaimer";
 
 export const metadata: Metadata = {
-  title: "JoSAA Rank Explorer",
+  title: "RankRoute",
   description: "Search and understand JoSAA opening and closing rank data."
 };
 
@@ -21,11 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="sticky top-0 z-20 border-b border-black/10 bg-[#fdfbf7]/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-            <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-normal text-[var(--foreground)] sm:text-base">
-              <span className="grid size-9 place-items-center rounded-md bg-[var(--primary)] text-white">
-                <BarChart3 size={18} />
-              </span>
-              <span>JoSAA Rank Explorer</span>
+            <Link href="/" className="focus-ring flex min-h-10 items-center rounded-md">
+              <img
+                src="/rankroute-logo.png"
+                alt="RankRoute"
+                className="h-9 w-auto max-w-[12rem] object-contain sm:h-10 sm:max-w-[14rem]"
+              />
             </Link>
             <nav className="flex items-center gap-1 overflow-x-auto text-sm text-[var(--muted)]">
               {navItems.map(({ label, href }, index) => {
@@ -48,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main>{children}</main>
         <footer className="border-t border-[var(--border)] bg-[#fdfbf7]">
           <div className="mx-auto max-w-7xl px-4 py-6 text-sm text-[var(--muted)] sm:px-6 lg:px-8">
-            Independent JoSAA OR-CR search interface.
+            RankRoute is an independent JoSAA OR-CR search interface.
           </div>
         </footer>
       </body>

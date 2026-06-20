@@ -57,6 +57,19 @@ export async function GET(request: NextRequest) {
   const predictionYear = filters.year ?? ((availableYears[0] ?? new Date().getFullYear()) + 1);
   const historyStartYear = predictionYear - 5;
   const historyEndYear = predictionYear - 1;
+  const historyYears = availableYears.filter((year) => year >= historyStartYear && year <= historyEndYear);
+  const latestRoundByYear: Record<number, number> = {};
+  for (const year of historyYears) {
+    const { data: latestRoundRows, error: latestRoundError } = await supabase
+      .from("josaa_cutoffs")
+      .select("round")
+      .eq("year", year)
+      .order("round", { ascending: false })
+      .limit(1);
+    if (latestRoundError) return NextResponse.json({ error: latestRoundError.message }, { status: 500 });
+    if (latestRoundRows?.[0]?.round) latestRoundByYear[year] = latestRoundRows[0].round;
+  }
+
   const instituteTypes = effectiveInstituteTypes(filters);
   const shouldFilterInstituteRelation =
     Boolean(instituteTypes?.length);
@@ -65,18 +78,17 @@ export async function GET(request: NextRequest) {
     : "institutes(institute_type,state)";
   const minimumNearbyClosingRank = Math.floor(filters.rank / PREDICTOR_THRESHOLDS.risky);
 
-  function buildRowsQuery(from: number, to: number) {
+  function buildRowsQuery(year: number, round: number, from: number, to: number) {
     let query = supabase
       .from("josaa_cutoffs")
       .select(`id,year,round,institute_name_raw,program_name_raw,quota,seat_type,gender,opening_rank_raw,closing_rank_raw,closing_rank_num,rank_list_type,${instituteSelect}`)
       .not("closing_rank_num", "is", null)
-      .gte("year", historyStartYear)
-      .lte("year", historyEndYear)
+      .eq("year", year)
+      .eq("round", round)
       .gte("closing_rank_num", minimumNearbyClosingRank)
       .order("closing_rank_num", { ascending: true })
       .range(from, to);
 
-    if (filters.round) query = query.eq("round", filters.round);
     if (instituteTypes?.length) query = query.in("institutes.institute_type", instituteTypes);
     if (filters.state) query = applyHomeStateInstituteFilter(query, filters.state);
     if (filters.institute_values) query = query.in("institute_name_raw", filters.institute_values.split("~").filter(Boolean));
@@ -88,12 +100,16 @@ export async function GET(request: NextRequest) {
 
   const data: any[] = [];
   const pageSize = 1000;
-  for (let page = 0; page < 12; page += 1) {
-    const from = page * pageSize;
-    const { data: rows, error } = await buildRowsQuery(from, from + pageSize - 1);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    data.push(...(rows ?? []));
-    if (!rows || rows.length < pageSize) break;
+  for (const year of historyYears) {
+    const latestRound = latestRoundByYear[year];
+    if (!latestRound) continue;
+    for (let page = 0; page < 8; page += 1) {
+      const from = page * pageSize;
+      const { data: rows, error } = await buildRowsQuery(year, latestRound, from, from + pageSize - 1);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      data.push(...(rows ?? []));
+      if (!rows || rows.length < pageSize) break;
+    }
   }
 
   const grouped = { Safe: [], Moderate: [], Risky: [] } as Record<string, unknown[]>;
@@ -113,7 +129,8 @@ export async function GET(request: NextRequest) {
     grouped,
     grouped_by_year: groupedByYear,
     prediction_year: predictionYear,
-    history_years: availableYears.filter((year) => year >= historyStartYear && year <= historyEndYear),
+    latest_round_by_year: latestRoundByYear,
+    history_years: historyYears,
     explanation: "This is based only on previous OR-CR data and cannot guarantee admission."
   });
 }
