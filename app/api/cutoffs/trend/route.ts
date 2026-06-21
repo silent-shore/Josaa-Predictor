@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     .order("round", { ascending: true });
 
   const quota = params.get("quota");
-  if (quota && quota !== "AI") {
+  if (quota) {
     query = query.eq("quota", quota);
   }
 

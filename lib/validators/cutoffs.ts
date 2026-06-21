@@ -35,12 +35,14 @@ export const predictQuerySchema = z.object({
   rank: z.string().transform((value) => Number.parseInt(value, 10)).pipe(z.number().int().positive()),
   exam_type: z.enum(["JEE Main", "JEE Advanced"]),
   year: optionalInt,
-  round: optionalInt,
   institute_type: z.string().optional(),
   institute_values: z.string().optional(),
   state: z.string().optional(),
   quota: z.string().optional(),
   seat_type: z.string().optional(),
   gender: z.string().optional(),
-  branch: z.string().optional()
+  branch: z.string().optional(),
+  bucket: z.enum(["Safe", "Moderate", "Risky"]).optional(),
+  page: optionalInt.default(1),
+  page_size: optionalInt.default(6)
 });

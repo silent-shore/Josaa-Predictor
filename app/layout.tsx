@@ -1,18 +1,24 @@
 import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
-import { BarChart3, Search } from "lucide-react";
+import { BarChart3, Building2, Search } from "lucide-react";
 import "./globals.css";
 import { Disclaimer } from "@/components/disclaimer";
 
 export const metadata: Metadata = {
-  title: "RankRoute",
-  description: "Search and understand JoSAA opening and closing rank data."
+  title: "JoSAA RankMap",
+  description: "Search and understand JoSAA opening and closing rank data.",
+  icons: {
+    icon: "/josaa-rankmap-icon.png",
+    shortcut: "/josaa-rankmap-icon.png",
+    apple: "/josaa-rankmap-icon.png"
+  }
 };
 
 const navItems: Array<{ label: string; href: Route }> = [
   { label: "OR-CR Search", href: "/search" },
-  { label: "Predictor", href: "/predictor" }
+  { label: "Predictor", href: "/predictor" },
+  { label: "Institutes", href: "/institutes" }
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,14 +29,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <Link href="/" className="focus-ring flex min-h-10 items-center rounded-md">
               <img
-                src="/rankroute-logo.png"
-                alt="RankRoute"
-                className="h-9 w-auto max-w-[12rem] object-contain sm:h-10 sm:max-w-[14rem]"
+                src="/josaa-rankmap-logo.png"
+                alt="JoSAA RankMap"
+                className="h-10 w-auto max-w-[13rem] object-contain sm:h-11 sm:max-w-[16rem]"
               />
             </Link>
             <nav className="flex items-center gap-1 overflow-x-auto text-sm text-[var(--muted)]">
               {navItems.map(({ label, href }, index) => {
-                const Icon = [Search, BarChart3][index];
+                const Icon = [Search, BarChart3, Building2][index];
                 return (
                 <Link
                   key={href}
@@ -49,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main>{children}</main>
         <footer className="border-t border-[var(--border)] bg-[#fdfbf7]">
           <div className="mx-auto max-w-7xl px-4 py-6 text-sm text-[var(--muted)] sm:px-6 lg:px-8">
-            RankRoute is an independent JoSAA OR-CR search interface.
+            JoSAA RankMap is an independent JoSAA OR-CR search interface.
           </div>
         </footer>
       </body>

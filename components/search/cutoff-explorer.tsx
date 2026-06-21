@@ -4,6 +4,7 @@ import { Check, ExternalLink, RotateCcw, Search, X } from "lucide-react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { InstituteLink } from "@/components/institute-link";
 import { RoundTrendModal } from "@/components/search/round-trend-modal";
 import type { CutoffMeta, CutoffResponse, SearchFilters } from "@/components/search/types";
 import { Button } from "@/components/ui/button";
@@ -365,7 +366,7 @@ export function CutoffExplorer() {
           <div className="bg-gradient-to-br from-white via-[#fbfaf7] to-[#e7f5f1] p-6 lg:p-8">
             <div>
               <p className="eyebrow">Opening and closing ranks</p>
-              <h1 className="mt-3 text-4xl font-black tracking-normal text-[#001d19] sm:text-5xl">RankRoute</h1>
+              <h1 className="mt-3 text-4xl font-black tracking-normal text-[#001d19] sm:text-5xl">JoSAA RankMap</h1>
             </div>
           </div>
         </section>
@@ -529,7 +530,9 @@ export function CutoffExplorer() {
               <tbody className="divide-y divide-[var(--border)] bg-white">
                 {result.rows.map((row) => (
                   <tr key={row.id} className="hover:bg-emerald-50/40">
-                    <td className="min-w-72 px-4 py-3 font-black">{row.institute_name_raw}</td>
+                    <td className="min-w-72 px-4 py-3 font-black">
+                      <InstituteLink name={row.institute_name_raw} className="text-[var(--primary)] underline-offset-4 hover:underline" />
+                    </td>
                     <td className="min-w-72 px-4 py-3 text-[var(--muted)]">{row.program_name_raw}</td>
                     <td className="px-4 py-3">{row.seat_type}</td>
                     <td className="px-4 py-3">{row.gender}</td>

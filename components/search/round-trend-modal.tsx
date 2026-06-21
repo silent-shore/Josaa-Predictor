@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
+import { InstituteLink } from "@/components/institute-link";
 import type { CutoffRow } from "@/lib/cutoff-query";
 
 export function RoundTrendModal({
@@ -38,7 +39,9 @@ export function RoundTrendModal({
         <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-[var(--border)] bg-white px-5 py-4">
           <div>
             <h2 className="text-lg font-black">Year and round-wise cutoff trend</h2>
-            <p className="mt-1 text-sm font-medium text-[var(--muted)]">{row.institute_name_raw}</p>
+            <p className="mt-1 text-sm font-medium">
+              <InstituteLink name={row.institute_name_raw} className="text-[var(--primary)] underline-offset-4 hover:underline" />
+            </p>
             <p className="text-sm text-[var(--muted)]">{row.program_name_raw}</p>
           </div>
           <button className="focus-ring rounded-md p-2 hover:bg-[#f4eee5]" type="button" onClick={onClose} aria-label="Close trend modal">

@@ -1,3 +1,4 @@
+import { InstituteLink } from "@/components/institute-link";
 import type { CutoffRow } from "@/lib/cutoff-query";
 
 export function CutoffTable({ rows }: { rows: CutoffRow[] }) {
@@ -28,7 +29,9 @@ export function CutoffTable({ rows }: { rows: CutoffRow[] }) {
             <tr key={row.id} className="bg-white hover:bg-[#fffaf3]">
               <td className="px-4 py-3 font-semibold">{row.year}</td>
               <td className="px-4 py-3">{row.round}</td>
-              <td className="min-w-64 px-4 py-3 font-bold text-[var(--foreground)]">{row.institute_name_raw}</td>
+              <td className="min-w-64 px-4 py-3 font-bold">
+                <InstituteLink name={row.institute_name_raw} className="text-[var(--primary)] underline-offset-4 hover:underline" />
+              </td>
               <td className="min-w-80 px-4 py-3 text-[var(--muted)]">{row.program_name_raw}</td>
               <td className="px-4 py-3">{row.quota ?? "-"}</td>
               <td className="px-4 py-3">{row.seat_type ?? "-"}</td>

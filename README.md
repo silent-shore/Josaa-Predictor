@@ -1,4 +1,4 @@
-# RankRoute
+# JoSAA RankMap
 
 Production-shaped Next.js app for searching, filtering, comparing, and importing JoSAA Opening Rank / Closing Rank data.
 

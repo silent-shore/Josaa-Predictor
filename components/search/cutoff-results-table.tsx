@@ -1,6 +1,7 @@
 "use client";
 
 import { BarChart3, ChevronsUpDown } from "lucide-react";
+import { InstituteLink } from "@/components/institute-link";
 import type { CutoffRow } from "@/lib/cutoff-query";
 
 function Badge({ children }: { children: React.ReactNode }) {
@@ -73,7 +74,9 @@ export function CutoffResultsTable({
               const instituteType = Array.isArray(row.institutes) ? row.institutes[0]?.institute_type : row.institutes?.institute_type;
               return (
                 <tr key={row.id} className="bg-white hover:bg-[#fffaf3]">
-                  <td className="px-3 py-3 font-black text-[var(--foreground)]">{row.institute_name_raw}</td>
+                  <td className="px-3 py-3 font-black">
+                    <InstituteLink name={row.institute_name_raw} className="text-[var(--primary)] underline-offset-4 hover:underline" />
+                  </td>
                   <td className="px-3 py-3 font-medium text-[var(--muted)]">{row.program_name_raw}</td>
                   <td className="px-3 py-3"><Badge>{instituteType?.replace("Indian Institute of ", "") ?? "-"}</Badge></td>
                   <td className="px-3 py-3"><Badge>{row.quota ?? "-"}</Badge></td>

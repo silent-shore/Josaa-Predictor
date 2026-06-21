@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { InstituteLink } from "@/components/institute-link";
 import { RankBadge } from "@/components/rank-badge";
 import { Button } from "@/components/ui/button";
 import { Field, OptionList } from "@/components/ui/field";
@@ -91,7 +92,9 @@ export function RankSearchMode({ year, round }: { year?: string; round?: string 
               <div className="grid gap-2">
                 {(grouped[bucket] ?? []).slice(0, 8).map((row) => (
                   <div key={row.id} className="border-t border-[var(--border)] pt-2 text-sm">
-                    <p className="font-black">{row.institute_name_raw}</p>
+                    <p className="font-black">
+                      <InstituteLink name={row.institute_name_raw} className="text-[var(--primary)] underline-offset-4 hover:underline" />
+                    </p>
                     <p className="text-xs font-medium text-[var(--muted)]">{row.program_name_raw}</p>
                     <p className="mt-1 text-xs text-[var(--muted)]">Closing {row.closing_rank_raw} · R{row.round}</p>
                   </div>
